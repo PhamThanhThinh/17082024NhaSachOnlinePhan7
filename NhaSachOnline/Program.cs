@@ -1,6 +1,7 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NhaSachOnline.Data;
+using NhaSachOnline.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +17,10 @@ builder.Services
   .AddDefaultUI()
   .AddDefaultTokenProviders();
 builder.Services.AddControllersWithViews();
-
+// add một cái service tạm thời (transient)
+builder.Services.AddTransient<IHomeRepository, HomeRepository>();
+builder.Services.AddTransient<IBookRepository, BookRepository>();
+builder.Services.AddTransient<ICartRepository, CartRepository>();
 var app = builder.Build();
 //using (var scope = app.Services.CreateScope())
 //{

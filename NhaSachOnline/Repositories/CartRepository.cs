@@ -13,11 +13,16 @@ namespace NhaSachOnline.Repositories
     private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly IHttpContextAccessor _contextAccessor;
+    private UserManager<IdentityUser>? userManager;
 
-    public CartRepository(ApplicationDbContext dbContext)
-    {
-      _dbContext = dbContext;
-    }
+    //public CartRepository(ApplicationDbContext dbContext, 
+    //  IHttpContextAccessor iHttpContextAccessor, 
+    //  UserManager<IdentityUser userManager>)
+    //{
+    //  _dbContext = dbContext;
+    //  _userManager = userManager;
+    //  _contextAccessor = iHttpContextAccessor;
+    //}
 
     public Task<int> AddItem(int bookId, int soluong)
     {
@@ -107,37 +112,111 @@ namespace NhaSachOnline.Repositories
 
     public async Task<int> GetCartItemCount(string userId = "")
     {
-      throw new NotImplementedException();
+      // cập nhật
+      if (string.IsNullOrEmpty(userId))
+      {
+        userId = GetUserId();
+      }
+      var data = await (
+        from cart in _dbContext.ShoppingCarts
+        join cartDetail in _dbContext.CartDetails
+        on cart.Id equals cartDetail.ShoppingCartId
+        where cart.UserId == userId // cập nhật
+        select new { cartDetail.Id }
+        ).ToListAsync();
+      return data.Count();
     }
 
     public async Task<ShoppingCart> GetUserCart(int id)
     {
-      throw new NotImplementedException();
+      var userId = GetUserId();
+      if (userId == null)
+      {
+        throw new InvalidOperationException("khong the tim thay id");
+      }
+      //var shoppingCart = await _dbContext.ShoppingCarts
+      //  .Include(cart => cart.CartDetails)
+      //  .ThenInclude(book => book.Book)
+
+      var shoppingCart = await _dbContext.ShoppingCarts
+        .Include(cart => cart.CartDetails)
+        .ThenInclude(book => book.Book)
+        .ThenInclude(stock => stock.Stock)
+        .Include(cartdetail => cartdetail.CartDetails)
+        .ThenInclude(book => book.Book)
+        .ThenInclude(book => book.Genre)
+        .Where(userid => userid.UserId == userId).FirstOrDefaultAsync();
+
+      // stock liên quan tới việc lưu trữ hàng hóa trong kho
+      return shoppingCart;
     }
 
     public async Task<int> RemoveItem(int bookId)
     {
-      throw new NotImplementedException();
+      string userId = GetUserId();
+      // xử lý ngoại lệ
+      try
+      {
+        if (string.IsNullOrEmpty(userId))
+        {
+          throw new UnauthorizedAccessException("bạn chưa đăng nhập");
+        }
+        
+        var cart = await GetCart(userId);
+        if (cart is null)
+        {
+          throw new UnauthorizedAccessException("giỏ hàng trống");
+        }
+
+        // shopping phải đồng bộ trong nguyên một đoạn code:
+        // shopping => shopping.ShoppingCartId == cart.Id && shopping.BookId == bookId
+        var cartItem = _dbContext.CartDetails
+          .FirstOrDefault(shopping => shopping.ShoppingCartId == cart.Id && shopping.BookId == bookId);
+
+        if (cartItem is null)
+        {
+          throw new InvalidOperationException("không có item nào trong giỏ hàng");
+        }
+        else if (cartItem.Quantity == 1)
+        {
+          _dbContext.CartDetails.Remove(cartItem);
+        }
+        else
+        {
+          // cartItem.Quantity số lượng item không giảm xuống dưới 0, gây lỗi
+          cartItem.Quantity = cartItem.Quantity - 1;
+        }
+        _dbContext.SaveChanges();
+      }
+      catch (Exception ex)
+      {
+        // đối với các lỗi không mong muốn, ném nó vào đây
+        throw new UnauthorizedAccessException("lỗi, vui lòng chạy lại");
+      }
+
+      var cartItemCount = await GetCartItemCount(userId);
+
+      return cartItemCount;
     }
 
     private string GetUserId()
     {
       // Nhận diện người dùng
-      //var nhandiennguoidung = _contextAccessor.HttpContext.User;
-      //string userId = _userManager.GetUserId(nhandiennguoidung);
-      //return userId;
+      var nhandiennguoidung = _contextAccessor.HttpContext.User;
+      string userId = _userManager.GetUserId(nhandiennguoidung);
+      return userId;
 
       // Nhận diện người dùng
-      
-      var httpContext = _contextAccessor.HttpContext;
 
-      // kiểm tra
-      if (httpContext?.User != null)
-      {
-        return _userManager.GetUserId(httpContext.User);
-      }
+      //var httpContext = _contextAccessor.HttpContext;
 
-      return null;
+      //// kiểm tra
+      //if (httpContext?.User != null)
+      //{
+      //  return _userManager.GetUserId(httpContext.User);
+      //}
+
+      //return null;
     }
 
   }

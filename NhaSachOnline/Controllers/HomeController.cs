@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using NhaSachOnline.Models;
+using NhaSachOnline.Models.DTOs;
 using NhaSachOnline.Repositories;
 using System.Diagnostics;
 
@@ -16,23 +17,19 @@ namespace NhaSachOnline.Controllers
       _homeRepository = homeRepository;
     }
 
-    //public async Task<IActionResult> Index(string keySearch = "", int theLoaiId = 0)
-    //{
-    //  IEnumerable<Book> books = await _homeRepository.LayThongTinSachTuDatabase(keySearch, theLoaiId);
-    //  IEnumerable<Genre> genres = await _homeRepository.LayThongTinSachTuDatabase(keySearch, theLoaiId);
-    //  BookDislayModel bookDislayModel = new BookDislayModel
-    //  {
-    //    Books = books,
-    //    Genres = genges,
-    //    KeySearch = keySearch
-    //  };
-
-    //  return View(books);
-    //}
-
-    public IActionResult Index()
+    public async Task<IActionResult> Index(string keySearch = "", int theLoaiId = 0)
     {
-      return View();
+      IEnumerable<Book> books = await _homeRepository.LayThongTinSachTuDatabase(keySearch, theLoaiId);
+      IEnumerable<Genre> genres = await _homeRepository.Genres();
+      BookDislayModel bookDislayModel = new BookDislayModel
+      {
+        Books = books,
+        Genres = genres,
+        KeySearch = keySearch,
+        TheLoaiId = theLoaiId
+      };
+
+      return View(bookDislayModel);
     }
 
     public IActionResult Privacy()
